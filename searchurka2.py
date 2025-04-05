@@ -1,10 +1,20 @@
 import asyncio
-from telethon import TelegramClient, events
+from telethon import TelegramClient, events, errors
 from telethon.tl.types import Channel, User, Chat
 import g4f
 import random
 from functools import partial
 from concurrent.futures import TimeoutError
+import sys
+import signal
+import logging
+
+# Настройка логирования
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 # Телеграм API-ключи
 api_id = 27253387
@@ -13,7 +23,29 @@ api_hash = 'be38587d6486b296ed6e457088201771'
 # ID канала для уведомлений о нарушениях
 alert_channel_id = 2574801649
 
-client = TelegramClient('anon', api_id, api_hash)
+# Флаг для корректного завершения
+running = True
+
+def signal_handler(signum, frame):
+    global running
+    logger.info(f"Получен сигнал {signum}")
+    running = False
+
+# Регистрируем обработчики сигналов
+signal.signal(signal.SIGINT, signal_handler)
+signal.signal(signal.SIGTERM, signal_handler)
+
+client = TelegramClient(
+    'anon', 
+    api_id, 
+    api_hash,
+    device_model="Desktop",
+    system_version="Windows 10",
+    app_version="1.0",
+    retry_delay=1,
+    connection_retries=None,
+    auto_reconnect=True
+)
 
 async def check_content_with_gpt(text):
     prompt = """Проанализируй следующий текст и определи, содержит ли он:
@@ -125,39 +157,70 @@ async def handler(event):
             pass
         await asyncio.sleep(1)
 
+async def keep_alive():
+    global running
+    while running:
+        try:
+            if not client.is_connected():
+                await client.connect()
+            await asyncio.sleep(1)
+        except Exception as e:
+            logger.error(f"Ошибка в keep_alive: {e}")
+            await asyncio.sleep(5)
+
 async def main():
+    global running
     try:
-        print("\n" + "="*50)
-        print("🔵 Подключение к Telegram...")
-        await client.start()
+        logger.info("Запуск бота...")
+        
+        # Подключение и авторизация
+        await client.connect()
+        if not await client.is_user_authorized():
+            logger.warning("Требуется авторизация!")
+            await client.start()
         
         # Получаем информацию о юзерботе
         me = await client.get_me()
-        print("\n📱 Информация об аккаунте:")
-        print(f"ID: {me.id}")
-        print(f"Имя: {me.first_name}")
-        print(f"Username: @{me.username if me.username else 'Отсутствует'}")
-        print(f"Телефон: {me.phone if me.phone else 'Не указан'}")
-        print(f"Премиум: {'Да' if me.premium else 'Нет'}")
-        print("="*50 + "\n")
+        logger.info(f"Бот запущен как: @{me.username if me.username else me.id}")
         
+        print("\n" + "="*50)
         print("✅ Успешно подключено!")
         print("🔵 Бот запущен и слушает сообщения из каналов...")
         
-        await client.run_until_disconnected()
-    except KeyboardInterrupt:
-        print("\n⚠️ Получен сигнал завершения...")
+        # Запускаем keep_alive в отдельной задаче
+        keep_alive_task = asyncio.create_task(keep_alive())
+        
+        # Основной цикл работы
+        while running:
+            try:
+                await asyncio.sleep(1)
+            except Exception as e:
+                logger.error(f"Ошибка в основном цикле: {e}")
+                await asyncio.sleep(5)
+                
     except Exception as e:
-        print(f"\n❌ Ошибка: {str(e)}")
+        logger.error(f"Критическая ошибка: {e}")
     finally:
-        print("🔄 Закрытие соединения...")
-        await client.disconnect()
-        print("✅ Бот остановлен")
+        running = False
+        try:
+            # Отменяем keep_alive
+            keep_alive_task.cancel()
+            await client.disconnect()
+            logger.info("Соединение закрыто корректно")
+        except Exception as e:
+            logger.error(f"Ошибка при закрытии соединения: {e}")
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        # Запускаем бота в бесконечном цикле с автоперезапуском
+        while True:
+            try:
+                asyncio.run(main())
+                if not running:  # Если получен сигнал остановки
+                    break
+            except Exception as e:
+                logger.critical(f"Фатальная ошибка: {e}")
+                asyncio.sleep(5)  # Пауза перед перезапуском
     except KeyboardInterrupt:
-        print("\n⛔ Принудительная остановка бота")
-    except Exception as e:
-        print(f"\n❌ Критическая ошибка: {str(e)}")
+        running = False
+        print("\n⛔ Корректная остановка бота")
