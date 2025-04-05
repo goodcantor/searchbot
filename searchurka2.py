@@ -53,10 +53,14 @@ async def handler(event):
     try:
         chat = await event.get_chat()
         
-        # Проверяем, является ли источник каналом и не является ли комментарием
-        if (not isinstance(chat, Channel) or 
-            chat.id == alert_channel_id or 
-            event.message.reply_to is not None):
+        # Игнорируем если:
+        # - это не канал (личка, группа, супергруппа)
+        # - это канал модерации
+        # - это комментарий
+        if (not isinstance(chat, Channel) or  # только каналы
+            isinstance(chat, (User, Chat)) or  # игнорируем чаты и личку
+            chat.id == alert_channel_id or  # игнорируем канал модерации
+            event.message.reply_to):  # игнорируем комментарии
             return
             
         # Выводим информацию о сообщении
@@ -84,12 +88,11 @@ async def handler(event):
             await client.forward_messages(alert_channel_id, event.message)
             print("❌ Сообщение переслано (нарушение/ошибка)")
             
-
-            if random.random() < 0.4:
+            if random.random() < 0.4:  # 40% вероятность
                 try:
                     # Генерируем провокационный вопрос через GPT
                     prompt = f"""На основе этого текста сгенерируй один провокационный вопрос, 
-                    который вызовет дискуссию. Вопрос должен быть кратким и спорным. Задавай вопрос на русском языке и в неформальном стиле. Задавай вопрос в грубой форме, оказывай давление на человека.
+                    который вызовет дискуссию. Вопрос должен быть кратким и спорным.
                     
                     Текст: {message_text}
                     """
@@ -102,7 +105,7 @@ async def handler(event):
                         )
                     )
                     
-                    question = await asyncio.wait_for(question_task, timeout=80.0)
+                    question = await asyncio.wait_for(question_task, timeout=30.0)
                     
                     # Отправляем вопрос с тегами
                     await client.send_message(
