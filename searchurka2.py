@@ -126,23 +126,38 @@ async def handler(event):
         await asyncio.sleep(1)
 
 async def main():
-    print("\n" + "="*50)
-    print("🔵 Подключение к Telegram...")
-    await client.start()
-    
-    # Получаем информацию о юзерботе
-    me = await client.get_me()
-    print("\n📱 Информация об аккаунте:")
-    print(f"ID: {me.id}")
-    print(f"Имя: {me.first_name}")
-    print(f"Username: @{me.username if me.username else 'Отсутствует'}")
-    print(f"Телефон: {me.phone if me.phone else 'Не указан'}")
-    print(f"Премиум: {'Да' if me.premium else 'Нет'}")
-    print("="*50 + "\n")
-    
-    print("✅ Успешно подключено!")
-    print("🔵 Бот запущен и слушает сообщения из каналов...")
-    await client.run_until_disconnected()
+    try:
+        print("\n" + "="*50)
+        print("🔵 Подключение к Telegram...")
+        await client.start()
+        
+        # Получаем информацию о юзерботе
+        me = await client.get_me()
+        print("\n📱 Информация об аккаунте:")
+        print(f"ID: {me.id}")
+        print(f"Имя: {me.first_name}")
+        print(f"Username: @{me.username if me.username else 'Отсутствует'}")
+        print(f"Телефон: {me.phone if me.phone else 'Не указан'}")
+        print(f"Премиум: {'Да' if me.premium else 'Нет'}")
+        print("="*50 + "\n")
+        
+        print("✅ Успешно подключено!")
+        print("🔵 Бот запущен и слушает сообщения из каналов...")
+        
+        await client.run_until_disconnected()
+    except KeyboardInterrupt:
+        print("\n⚠️ Получен сигнал завершения...")
+    except Exception as e:
+        print(f"\n❌ Ошибка: {str(e)}")
+    finally:
+        print("🔄 Закрытие соединения...")
+        await client.disconnect()
+        print("✅ Бот остановлен")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\n⛔ Принудительная остановка бота")
+    except Exception as e:
+        print(f"\n❌ Критическая ошибка: {str(e)}")
