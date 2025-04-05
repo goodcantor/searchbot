@@ -31,7 +31,7 @@ async def check_content_with_gpt(text):
         gpt_task = asyncio.create_task(
             asyncio.to_thread(
                 g4f.ChatCompletion.create,
-                model=g4f.models.gpt_35_turbo,
+                model="gpt-3.5-turbo",
                 messages=[{"role": "user", "content": prompt + text}]
             )
         )
@@ -100,7 +100,7 @@ async def handler(event):
                     question_task = asyncio.create_task(
                         asyncio.to_thread(
                             g4f.ChatCompletion.create,
-                            model=g4f.models.gpt_35_turbo,
+                            model="gpt-3.5-turbo",
                             messages=[{"role": "user", "content": prompt}]
                         )
                     )
