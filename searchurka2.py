@@ -212,15 +212,11 @@ async def main():
 
 if __name__ == "__main__":
     try:
-        # Запускаем бота в бесконечном цикле с автоперезапуском
-        while True:
-            try:
-                asyncio.run(main())
-                if not running:  # Если получен сигнал остановки
-                    break
-            except Exception as e:
-                logger.critical(f"Фатальная ошибка: {e}")
-                asyncio.sleep(5)  # Пауза перед перезапуском
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(main())
     except KeyboardInterrupt:
         running = False
         print("\n⛔ Корректная остановка бота")
+    finally:
+        loop.close()
